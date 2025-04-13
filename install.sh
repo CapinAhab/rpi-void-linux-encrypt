@@ -1,6 +1,6 @@
 #!/bin/sh
-#not bash problem
 
+#Install dependencies on host system
 xbps-install parted wget cryptsetup xtools binfmt-support
 
 ln -s /etc/sv/binfmt-support /var/service/
@@ -41,13 +41,10 @@ rm void-rpi-aarch64-PLATFORMFS-20250202.tar.xz
 xgenfstab /mnt > /mnt/etc/fstab
 
 #Setup glibc
-xchroot echo "LANG=en_US.UTF-8" > /etc/locale.conf
-xchroot echo "en_US.UTF-8 UTF-8" >> /etc/default/libc-locales
-xchroot xbps-reconfigure -f glibc-locales 
+xchroot echo "LANG=en_US.UTF-8" > /etc/locale.conf; echo "en_US.UTF-8 UTF-8" >> /etc/default/libc-locales; xbps-reconfigure -f glibc-locales 
 
 #Install requirements on the encrypted system
-xchroot /mnt xbps-install -Suvy
-xchroot /mnt xbps-install -Sy cryptsetup dropbear dracut-crypt-ssh
+xchroot /mnt xbps-install -Suvy cryptsetup dropbear dracut-crypt-ssh
 
 #Setup boot options
 echo "initramfs initrd.img followkernel" >> /mnt/boot/config.txt

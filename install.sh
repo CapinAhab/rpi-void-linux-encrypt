@@ -16,7 +16,7 @@ parted /dev/mmcblk0 mkpart primary ext4 257M 100%
 
 
 #Setup encrypted root
-cryptsetup luksFormat /dev/mmcblk0p2
+cryptsetup --type luks2 --cipher xchacha20,aes-adiantum-plain64 luksFormat /dev/mmcblk0p2
 cryptsetup luksOpen /dev/mmcblk0p2 rpiroot
 
 #Setup logical volumes
@@ -38,31 +38,25 @@ tar xvfp void-rpi-aarch64-PLATFORMFS-20250202.tar.xz -C /mnt #install system
 rm void-rpi-aarch64-PLATFORMFS-20250202.tar.xz
 
 #Create fstab
-cp configs/fstab /mnt/etc/fstab
-#Setup glibc
-#xchroot echo "LANG=en_US.UTF-8" > /etc/locale.conf; echo "en_US.UTF-8 UTF-8" >> /etc/default/libc-locales; xbps-reconfigure -f glibc-locales 
+echo $(lsblk -o uuid /dev/rpiroot/swap | sed -n '2p')	/              	btrfs      	rw        	0 1 >> /mnt/etc/fstab
+echo $(lsblk -o uuid /dev/rpiroot/root | sed -n '2p')	none           	swap      	defaults  	0 0 >> /mnt/etc/fstab
 
 #Install requirements on the encrypted system
-xchroot /mnt xbps-install -Suvy cryptsetup dropbear dracut-crypt-ssh
+xchroot /mnt xbps-install -Suvy cryptsetup lvm2 linux-headers dracut
 
 #Setup boot options
 echo "initramfs initrd.img followkernel" >> /mnt/boot/config.txt
 
 #Add dropbear ssh setttings to dracut
-cp configs/crypt-ssh.conf /mnt/etc/dracut.conf.d/
-cp configs/05-custom.conf /mnt/etc/dracut.conf.d/
+cp configs/10-crypt.conf /mnt/etc/dracut.conf.d/
 
-#Generate keys for authentication
-xchroot umask 0077; mkdir /root/.dracut; ssh-keygen -t rsa -f /root/.dracut/ssh_dracut_rsa_key; ssh-keygen -t ecdsa -f /root/.dracut/ssh_dracut_ecdsa_key
-
-#Give ssh keys to dropbear
-xchroot touch /root/.dracut/authorized_keys; chmod 700 /root/.dracut/authorized_keys; cat /root/.dracut/ssh_dracut_rsa_key.pub >> /root/.dracut/authorized_keys; cat /root/.dracut/ssh_dracut_ecdsa_key.pub >> /root/.dracut/authorized_keys
-
+#Setup Kenel vars
+sed -i "1s/.*/cryptdevice=PARTUUID=$(blkid -o value -s PARTUUID /dev/mmcblk0p2):rpiroot root=PARTUUID=$(blkid -o value -s PARTUUID /dev/rpiroot/root) rw console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 console=tty1 smsc95xx.turbo_mode=N dwc_otg.lpm_enable=0 loglevel=4 elevator=noop/" /mnt/boot/cmdline.txt
 
 #Generate initramfs
-xchroot /mnt dracut /boot/initrd.img --force 6.6.69_2
+xchroot depmod
+xchroot /mnt dracut /boot/initrd.img $(ls /usr/lib/modules/ | tail -1)
 
-cp configs/cmdline.txt /mnt/boot/cmdline.txt
 
 #Unmount partitions
 umount /mnt/boot

@@ -50,8 +50,11 @@ echo "initramfs initrd.img followkernel" >> /mnt/boot/config.txt
 #Add dropbear ssh setttings to dracut
 cp configs/10-crypt.conf /mnt/etc/dracut.conf.d/
 
+#Setup crypttab
+echo rpiroot /dev/mmcblk0p2 none luks >> /mnt/etc/crypttab
+
 #Setup Kenel vars
-sed -i "1s/.*/cryptdevice=PARTUUID=$(blkid -o value -s PARTUUID /dev/mmcblk0p2):rpiroot root=PARTUUID=$(blkid -o value -s PARTUUID /dev/rpiroot/root) rw console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 console=tty1 smsc95xx.turbo_mode=N dwc_otg.lpm_enable=0 loglevel=4 elevator=noop/" /mnt/boot/cmdline.txt
+sed -i "1s/.*/rd.lvm.vg=rpiroot rd.luks.uuid=$(lsblk -o uuid /dev/mmcblk0p2 | sed -n '2p') root=/dev/rpiroot/root rw console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 console=tty1 smsc95xx.turbo_mode=N dwc_otg.lpm_enable=0 loglevel=4 elevator=noop/" >> /mnt/boot/cmdline.txt
 
 #Generate initramfs
 xchroot depmod

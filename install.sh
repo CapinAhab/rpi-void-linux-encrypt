@@ -16,7 +16,7 @@ parted /dev/mmcblk0 mkpart primary ext4 257M 100%
 
 
 #Setup encrypted root
-cryptsetup --type luks2 --cipher xchacha20,aes-adiantum-plain64 luksFormat /dev/mmcblk0p2
+cryptsetup luksFormat /dev/mmcblk0p2
 cryptsetup luksOpen /dev/mmcblk0p2 rpiroot
 
 #Setup logical volumes
@@ -38,11 +38,8 @@ tar xvfp void-rpi-aarch64-PLATFORMFS-20250202.tar.xz -C /mnt #install system
 rm void-rpi-aarch64-PLATFORMFS-20250202.tar.xz
 
 #Create fstab
-echo $(lsblk -o uuid /dev/rpiroot/swap | sed -n '2p')	/              	btrfs      	rw        	0 1 >> /mnt/etc/fstab
-echo $(lsblk -o uuid /dev/rpiroot/root | sed -n '2p')	none           	swap      	defaults  	0 0 >> /mnt/etc/fstab
-
-#Install requirements on the encrypted system
-xchroot /mnt xbps-install -Suvy cryptsetup lvm2 linux-headers dracut
+echo $(lsblk -n -o UUID /dev/rpiroot/swap)	/              	btrfs      	rw        	0 1 >> /mnt/etc/fstab
+echo $(lsblk -n -o UUID /dev/rpiroot/root)	none           	swap      	defaults  	0 0 >> /mnt/etc/fstab
 
 #Setup boot options
 echo "initramfs initrd.img followkernel" >> /mnt/boot/config.txt
@@ -53,12 +50,17 @@ cp configs/10-crypt.conf /mnt/etc/dracut.conf.d/
 #Setup crypttab
 echo rpiroot /dev/mmcblk0p2 none luks >> /mnt/etc/crypttab
 
-#Setup Kenel vars
-sed -i "1s/.*/rd.lvm.vg=rpiroot rd.luks.uuid=$(lsblk -o uuid /dev/mmcblk0p2 | sed -n '2p') root=/dev/rpiroot/root rw console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 console=tty1 smsc95xx.turbo_mode=N dwc_otg.lpm_enable=0 loglevel=4 elevator=noop/" >> /mnt/boot/cmdline.txt
+#Setup Kernel vars
+truncate -s 0 /mnt/boot/cmdline.txt
+echo rd.lvm.vg=rpiroot rd.luks.uuid=$(lsblk -n -o UUID /dev/mmcblk0p2) root=/dev/rpiroot/root rw console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 console=tty1 smsc95xx.turbo_mode=N dwc_otg.lpm_enable=0 loglevel=4 elevator=noop >> /mnt/boot/cmdline.txt
+
+#Install requirements on the encrypted system
+xchroot /mnt xbps-install -Suvy cryptsetup lvm2 linux-mainline-headers linux-mainline dracut
+
 
 #Generate initramfs
-xchroot depmod
-xchroot /mnt dracut /boot/initrd.img $(ls /usr/lib/modules/ | tail -1)
+xchroot depmod $(ls -S /usr/lib/modules/ | head -1)
+xchroot /mnt dracut -f /boot/initrd.img $(ls -S /usr/lib/modules/ | head -1)
 
 
 #Unmount partitions

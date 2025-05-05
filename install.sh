@@ -63,8 +63,9 @@ chmod 000 /mnt/boot/volume.key
 cryptsetup luksAddKey /dev/mmcblk0p2 /mnt/boot/volume.key
 
 #Generate initramfs
-xchroot depmod $(uname -r)
-xchroot /mnt dracut -f /boot/initrd.img --kver $(uname -r)
+xchroot /mnt xbps-install -Suvy
+xchroot depmod $(ls -S /usr/lib/modules/ | tail -1)
+xchroot /mnt dracut -f /boot/initrd.img $(ls -S /usr/lib/modules/ | tail -1)
 
 
 #Unmount partitions

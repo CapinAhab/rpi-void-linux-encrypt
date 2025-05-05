@@ -43,24 +43,28 @@ echo $(lsblk -n -o UUID /dev/rpiroot/root)	none           	swap      	defaults  
 
 #Setup boot options
 echo "initramfs initrd.img followkernel" >> /mnt/boot/config.txt
-
-#Add dropbear ssh setttings to dracut
-cp configs/10-crypt.conf /mnt/etc/dracut.conf.d/
-
 #Setup crypttab
-echo rpiroot /dev/mmcblk0p2 none luks >> /mnt/etc/crypttab
+echo rpiroot /dev/mmcblk0p2 /boot/volume.key luks >> /mnt/etc/crypttab
 
 #Setup Kernel vars
 truncate -s 0 /mnt/boot/cmdline.txt
 echo rd.lvm.vg=rpiroot rd.luks.uuid=$(lsblk -n -o UUID /dev/mmcblk0p2) root=/dev/rpiroot/root rw console=ttyAMA0,115200 kgdboc=ttyAMA0,115200 console=tty1 smsc95xx.turbo_mode=N dwc_otg.lpm_enable=0 loglevel=4 elevator=noop >> /mnt/boot/cmdline.txt
 
 #Install requirements on the encrypted system
-xchroot /mnt xbps-install -Suvy cryptsetup lvm2 linux-base dracut
+xchroot /mnt xbps-install -Suvy cryptsetup lvm2 linux-base linux-headers dracut
 
+#Add dropbear ssh setttings to dracut
+cp configs/10-crypt.conf /mnt/etc/dracut.conf.d/
+
+dd bs=1 count=64 if=/dev/urandom of=/mnt/boot/volume.key
+
+chmod 000 /mnt/boot/volume.key 
+
+cryptsetup luksAddKey /dev/mmcblk0p2 /mnt/boot/volume.key
 
 #Generate initramfs
-xchroot depmod $(ls -S /usr/lib/modules/ | head -1)
-xchroot /mnt dracut -f /boot/initrd.img $(ls -S /usr/lib/modules/ | head -1)
+xchroot depmod $(uname -r)
+xchroot /mnt dracut -f /boot/initrd.img --kver $(uname -r)
 
 
 #Unmount partitions

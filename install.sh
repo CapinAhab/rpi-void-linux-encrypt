@@ -62,8 +62,12 @@ chmod 000 /mnt/boot/volume.key
 
 cryptsetup luksAddKey /dev/mmcblk0p2 /mnt/boot/volume.key
 
-#Generate initramfs
+#Make sure package is up to date and remove RPI optimisations
 xchroot /mnt xbps-install -Suvy
+xchroot /mnt xbps-remove rpi-base
+xchroot /mnt xbps-remove rpi-kernel
+
+#Generate initramfs
 xchroot depmod $(ls -S /usr/lib/modules/ | tail -1)
 xchroot /mnt dracut -f /boot/initrd.img $(ls -S /usr/lib/modules/ | tail -1)
 
